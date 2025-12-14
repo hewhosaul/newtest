@@ -90,13 +90,14 @@ class MacroDataCollector:
         
         if yields:
             try:
-                df = pd.DataFrame(yields)
+                # Use concat to handle Series with different indices
+                df = pd.concat(yields, axis=1)
                 df = df.dropna()
                 if len(df) > 0:
                     return df
                 logger.warning("All US yield data is NaN after dropna()")
             except Exception as e:
-                logger.warning(f"Failed to create US yield DataFrame: {e}")
+                logger.debug(f"Failed to create US yield DataFrame: {e}")
         
         # Fallback: create synthetic yield curve
         logger.warning("Using synthetic US yield curve (fallback)")
@@ -175,13 +176,14 @@ class MacroDataCollector:
         
         if pmi_data:
             try:
-                df = pd.DataFrame(pmi_data)
+                # Use concat to handle Series with different indices
+                df = pd.concat(pmi_data, axis=1)
                 df = df.dropna()
                 if len(df) > 0:
                     return df
                 logger.warning("All PMI data is NaN after dropna()")
             except Exception as e:
-                logger.warning(f"Failed to create PMI DataFrame: {e}")
+                logger.debug(f"Failed to create PMI DataFrame: {e}")
         
         # Fallback: synthetic PMI data
         logger.warning("Using synthetic PMI data (fallback)")
@@ -225,7 +227,14 @@ class MacroDataCollector:
                 logger.debug(f"Failed to fetch {metric}: {e}")
         
         if inflation_data:
-            return pd.DataFrame(inflation_data).dropna()
+            try:
+                # Use concat to handle Series with different indices
+                df = pd.concat(inflation_data, axis=1)
+                df = df.dropna()
+                if len(df) > 0:
+                    return df
+            except Exception as e:
+                logger.debug(f"Failed to create inflation DataFrame: {e}")
         
         # Fallback: synthetic inflation data
         logger.warning("Using synthetic inflation data (fallback)")
@@ -269,13 +278,14 @@ class MacroDataCollector:
         
         if spread_data:
             try:
-                df = pd.DataFrame(spread_data)
+                # Use concat to handle Series with different indices
+                df = pd.concat(spread_data, axis=1)
                 df = df.dropna()
                 if len(df) > 0:
                     return df
                 logger.warning("All credit spread data is NaN after dropna()")
             except Exception as e:
-                logger.warning(f"Failed to create credit spread DataFrame: {e}")
+                logger.debug(f"Failed to create credit spread DataFrame: {e}")
         
         # Fallback: synthetic credit spread data
         logger.warning("Using synthetic credit spread data (fallback)")
@@ -318,13 +328,14 @@ class MacroDataCollector:
         
         if fx_data:
             try:
-                df = pd.DataFrame(fx_data)
+                # Use concat to handle Series with different indices
+                df = pd.concat(fx_data, axis=1)
                 df = df.dropna()
                 if len(df) > 0:
                     return df
                 logger.warning("All FX data is NaN after dropna()")
             except Exception as e:
-                logger.warning(f"Failed to create FX DataFrame: {e}")
+                logger.debug(f"Failed to create FX DataFrame: {e}")
         
         # Fallback: synthetic FX data
         logger.warning("Using synthetic FX data (fallback)")
@@ -367,7 +378,14 @@ class MacroDataCollector:
                 logger.debug(f"Failed to fetch {commodity}: {e}")
         
         if commodity_data:
-            return pd.DataFrame(commodity_data).dropna()
+            try:
+                # Use concat to handle Series with different indices
+                df = pd.concat(commodity_data, axis=1)
+                df = df.dropna()
+                if len(df) > 0:
+                    return df
+            except Exception as e:
+                logger.debug(f"Failed to create commodity DataFrame: {e}")
         
         # Fallback: synthetic commodity data
         logger.warning("Using synthetic commodity data (fallback)")
@@ -413,7 +431,14 @@ class MacroDataCollector:
                 logger.debug(f"Failed to fetch {company}: {e}")
         
         if semi_data:
-            return pd.DataFrame(semi_data).dropna()
+            try:
+                # Use concat to handle Series with different indices
+                df = pd.concat(semi_data, axis=1)
+                df = df.dropna()
+                if len(df) > 0:
+                    return df
+            except Exception as e:
+                logger.debug(f"Failed to create semiconductor DataFrame: {e}")
         
         # Fallback: synthetic semiconductor data
         logger.warning("Using synthetic semiconductor data (fallback)")
@@ -460,7 +485,14 @@ class MacroDataCollector:
                 logger.debug(f"Failed to fetch {index}: {e}")
         
         if india_data:
-            return pd.DataFrame(india_data).dropna()
+            try:
+                # Use concat to handle Series with different indices
+                df = pd.concat(india_data, axis=1)
+                df = df.dropna()
+                if len(df) > 0:
+                    return df
+            except Exception as e:
+                logger.debug(f"Failed to create Indian equity DataFrame: {e}")
         
         # Fallback: synthetic Indian equity data
         logger.warning("Using synthetic Indian equity data (fallback)")
@@ -540,7 +572,14 @@ class MacroDataCollector:
                 logger.debug(f"Failed to fetch {index}: {e}")
         
         if trade_data:
-            return pd.DataFrame(trade_data).dropna()
+            try:
+                # Use concat to handle Series with different indices
+                df = pd.concat(trade_data, axis=1)
+                df = df.dropna()
+                if len(df) > 0:
+                    return df
+            except Exception as e:
+                logger.debug(f"Failed to create trade indices DataFrame: {e}")
         
         # Fallback: synthetic trade data
         logger.warning("Using synthetic trade indices data (fallback)")
@@ -582,7 +621,14 @@ class MacroDataCollector:
                 logger.debug(f"Failed to fetch {indicator}: {e}")
         
         if liquidity_data:
-            return pd.DataFrame(liquidity_data).dropna()
+            try:
+                # Use concat to handle Series with different indices
+                df = pd.concat(liquidity_data, axis=1)
+                df = df.dropna()
+                if len(df) > 0:
+                    return df
+            except Exception as e:
+                logger.debug(f"Failed to create liquidity DataFrame: {e}")
         
         # Fallback: synthetic liquidity data
         logger.warning("Using synthetic liquidity indicators data (fallback)")
