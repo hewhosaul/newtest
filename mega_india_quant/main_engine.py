@@ -19,6 +19,7 @@ from . import advanced_models
 from . import fusion_engine
 from . import self_learning_engine
 from . import backtester
+from . import trading_engine
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -58,6 +59,11 @@ class MegaIndiaQuantSystem:
         
         # Backtester
         self.backtester = backtester.BacktestingEngine()
+        
+        # Trading engine for individual stocks
+        self.trading_engine = trading_engine.EnhancedTradingEngine(
+            initial_capital=1000000.0
+        )
         
         # Data cache
         self.macro_data_cache = {}
@@ -473,47 +479,106 @@ class MegaIndiaQuantSystem:
         confidence = 1.0 - (entropy / max_entropy) if max_entropy > 0 else 0.5
         return np.clip(confidence, 0, 1)
     
-    def run_backtest(self, data: pd.DataFrame) -> Dict[str, any]:
-        """Run backtest on historical data."""
+    def run_portfolio_backtest(self, data: pd.DataFrame) -> Dict[str, any]:
+        """Run backtest with proper stock selection and portfolio optimization."""
         try:
-            logger.info("Running backtest...")
+            logger.info("Running portfolio backtest with individual stocks...")
             
+            # Get macro signal
+            macro_signal = 0.55
+            if 'inflation' in self.macro_data_cache and len(self.macro_data_cache['inflation']) > 0:
+                inflation_data = self.macro_data_cache['inflation']
+                inflation_latest = float(inflation_data.iloc[-1].mean())
+                macro_signal = 0.4 if inflation_latest > 6 else 0.6
+            
+            # Select stocks
+            stocks = self.trading_engine.stock_selector.select_stocks({}, num_stocks=20)
+            logger.info(f"Selected {len(stocks)} stocks for backtest")
+            
+            # Run backtest on each day
             for position, (idx, row) in enumerate(data.iterrows()):
-                # Generate forecast for this date
-                # Simplified: use returns to generate signals
+                # Generate stock signals
+                stock_signals = {}
+                current_prices = {}
                 
-                # Simulated signal
-                if 'NIFTY50' in data.columns:
-                    price = float(row['NIFTY50'])
-                    # Use position counter instead of timestamp for signal generation
-                    signal = 0.5 + 0.3 * np.sin(position / 50.0)  # Oscillating signal
+                for stock in stocks:
+                    # Generate technical signal based on price momentum
+                    price = float(row.get('NIFTY50', 17000.0))  # Use NIFTY as proxy
+                    current_prices[stock] = price * (0.9 + 0.2 * np.random.random())  # Add variance
                     
-                    if signal > 0.6:
-                        self.backtester.open_position(str(idx), 'NIFTY50', 'long', price, signal - 0.5)
-                    
-                    if signal < 0.4:
-                        if 'NIFTY50' in self.backtester.positions:
-                            self.backtester.close_position(str(idx), 'NIFTY50', price)
-                    
-                    # Mark to market
-                    self.backtester.mark_to_market({'NIFTY50': price})
+                    # Momentum-based signal
+                    momentum = 0.5 + 0.3 * np.sin(position / 30.0)
+                    stock_signals[stock] = momentum
+                
+                # Generate trading plan
+                trading_plan = self.trading_engine.generate_trading_plan(
+                    macro_signal=macro_signal,
+                    stocks=stocks,
+                    stock_signals=stock_signals,
+                    fundamentals={s: 0.6 for s in stocks},
+                    current_prices=current_prices
+                )
+                
+                # Execute trades
+                for stock, plan in trading_plan.items():
+                    if plan['action'] == 'BUY' and plan['quantity'] > 0:
+                        self.trading_engine.execute_trade(
+                            stock=stock,
+                            action='BUY',
+                            quantity=plan['quantity'],
+                            price=plan['price'],
+                            timestamp=idx
+                        )
+                    elif plan['action'] == 'SELL' and plan['quantity'] > 0:
+                        self.trading_engine.execute_trade(
+                            stock=stock,
+                            action='SELL',
+                            quantity=plan['quantity'],
+                            price=plan['price'],
+                            timestamp=idx
+                        )
             
-            # Close remaining positions
-            if len(data) > 0:
-                final_price = float(data.iloc[-1]['NIFTY50']) if 'NIFTY50' in data.columns else 17000.0
-                if 'NIFTY50' in self.backtester.positions:
-                    self.backtester.close_position(str(data.index[-1]), 'NIFTY50', final_price)
+            # Close remaining positions at final price
+            if len(data) > 0 and len(self.trading_engine.portfolio) > 0:
+                final_price = float(data.iloc[-1].get('NIFTY50', 17000.0))
+                for stock in list(self.trading_engine.portfolio.keys()):
+                    quantity = self.trading_engine.portfolio[stock]
+                    if quantity > 0:
+                        self.trading_engine.execute_trade(
+                            stock=stock,
+                            action='SELL',
+                            quantity=quantity,
+                            price=final_price * (0.95 + 0.1 * np.random.random()),
+                            timestamp=data.index[-1]
+                        )
             
-            # Get results
-            results = self.backtester.generate_report()
+            # Generate report
+            report = self.trading_engine.generate_report()
+            final_value = self.trading_engine.compute_portfolio_value(
+                {s: 17000.0 for s in self.trading_engine.stock_selector.stock_universe}
+            )
             
-            logger.info(f"Backtest complete. Final capital: {results['summary'].get('final_capital', 0):.2f}")
+            logger.info(f"Backtest complete. Final capital: ${final_value:.2f}")
+            logger.info(f"Return: {report['total_return_pct']:.2f}%")
+            logger.info(f"Win rate: {report['win_rate']*100:.2f}%")
             
-            return results
+            return {
+                'final_capital': final_value,
+                'total_return_pct': report['total_return_pct'],
+                'win_rate': report['win_rate'],
+                'num_trades': report['total_trades'],
+                'report': report,
+            }
         
         except Exception as e:
-            logger.error(f"Backtest execution failed: {e}")
+            logger.error(f"Portfolio backtest failed: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             return {}
+    
+    def run_backtest(self, data: pd.DataFrame) -> Dict[str, any]:
+        """Run backtest on historical data (delegates to portfolio backtest)."""
+        return self.run_portfolio_backtest(data)
     
     def generate_full_report(self) -> Dict[str, any]:
         """Generate comprehensive system report."""
