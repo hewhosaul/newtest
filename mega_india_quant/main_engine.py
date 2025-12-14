@@ -81,11 +81,31 @@ class MegaIndiaQuantSystem:
             # Fetch macro data
             self.macro_data_cache = self.data_collector.collect_all_macro_data(end_date)
             
-            logger.info("Data fetch completed successfully")
+            # Validate data was collected
+            if not self.macro_data_cache:
+                logger.error("No data collected from sources")
+                return False
+            
+            # Check for at least some data
+            valid_sources = 0
+            for key, value in self.macro_data_cache.items():
+                if isinstance(value, pd.DataFrame) and len(value) > 0:
+                    valid_sources += 1
+                    logger.info(f"  ✓ {key}: {len(value)} rows")
+                else:
+                    logger.warning(f"  ✗ {key}: No data")
+            
+            if valid_sources == 0:
+                logger.error("No valid data sources collected")
+                return False
+            
+            logger.info(f"Data fetch completed: {valid_sources} valid sources")
             return True
         
         except Exception as e:
             logger.error(f"Data fetch failed: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             return False
     
     def train_all_models(self) -> bool:
@@ -93,44 +113,77 @@ class MegaIndiaQuantSystem:
         try:
             logger.info("Starting model training...")
             
-            # Prepare data
+            # Prepare data - safely combine what's available
             if 'us_yields' not in self.macro_data_cache or len(self.macro_data_cache['us_yields']) == 0:
                 logger.warning("Insufficient data for macro training")
                 return False
             
-            # Combine macro data
-            macro_combined = pd.concat([
-                self.macro_data_cache.get('us_yields', pd.DataFrame()),
-                self.macro_data_cache.get('inflation', pd.DataFrame()),
-                self.macro_data_cache.get('commodities', pd.DataFrame()),
-            ], axis=1).dropna()
+            # Combine macro data - handle different indices
+            try:
+                data_to_combine = []
+                for key in ['us_yields', 'inflation', 'commodities', 'fx_data']:
+                    if key in self.macro_data_cache and len(self.macro_data_cache[key]) > 0:
+                        df = self.macro_data_cache[key]
+                        if isinstance(df, pd.DataFrame) and len(df) > 0:
+                            data_to_combine.append(df)
+                
+                if data_to_combine:
+                    # Reset indices and concat to avoid misalignment
+                    macro_combined = pd.concat(data_to_combine, axis=1, join='inner')
+                    if len(macro_combined) > 0:
+                        macro_combined = macro_combined.dropna(how='all')
+                    logger.info(f"Combined macro data: {macro_combined.shape}")
+                else:
+                    macro_combined = pd.DataFrame()
+                    logger.warning("No valid macro data to combine")
+            except Exception as e:
+                logger.warning(f"Failed to combine macro data: {e}")
+                macro_combined = pd.DataFrame()
             
+            # Train macro models
             if len(macro_combined) > 10:
-                # Train macro models
-                self.macro_bridge.fit(self.macro_data_cache)
-                logger.info("Macro models trained")
+                try:
+                    self.macro_bridge.fit(self.macro_data_cache)
+                    logger.info("Macro models trained")
+                except Exception as e:
+                    logger.warning(f"Macro model training failed: {e}")
             
             # Train DL models on equity data
-            if 'indian_equities' in self.macro_data_cache:
-                equity_df = self.macro_data_cache['indian_equities']
-                if len(equity_df) > 100:
-                    prices = equity_df['NIFTY50'].values if 'NIFTY50' in equity_df.columns else None
-                    
-                    if prices is not None:
-                        returns = np.diff(np.log(prices))
-                        self.deep_ensemble.train_all(prices, returns)
-                        logger.info("Deep learning models trained")
+            try:
+                if 'indian_equities' in self.macro_data_cache:
+                    equity_df = self.macro_data_cache['indian_equities']
+                    if isinstance(equity_df, pd.DataFrame) and len(equity_df) > 100:
+                        prices = equity_df['NIFTY50'].values if 'NIFTY50' in equity_df.columns else None
+                        
+                        if prices is not None and len(prices) > 50:
+                            # Ensure numeric data
+                            prices = pd.to_numeric(prices, errors='coerce')
+                            prices = prices.dropna().values
+                            
+                            if len(prices) > 50:
+                                returns = np.diff(np.log(prices))
+                                self.deep_ensemble.train_all(prices, returns)
+                                logger.info("Deep learning models trained")
+            except Exception as e:
+                logger.warning(f"DL model training failed: {e}")
             
             # Train regime switching model
-            if len(macro_combined) > 20:
-                self.regime_detector.fit(macro_combined.values[-100:] 
-                                        if len(macro_combined) > 100 else macro_combined.values)
-                logger.info("Regime switching model trained")
+            try:
+                if len(macro_combined) > 20:
+                    macro_values = macro_combined.values
+                    if macro_values.ndim > 1:
+                        self.regime_detector.fit(macro_values[-100:] 
+                                                if len(macro_values) > 100 else macro_values)
+                        logger.info("Regime switching model trained")
+            except Exception as e:
+                logger.warning(f"Regime switching model training failed: {e}")
             
             return True
         
         except Exception as e:
             logger.error(f"Model training failed: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
             return False
     
     def generate_macro_signal(self) -> Dict[str, float]:

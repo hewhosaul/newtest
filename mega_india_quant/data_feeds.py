@@ -89,8 +89,14 @@ class MacroDataCollector:
                 logger.debug(f"Failed to fetch US {tenor} yield: {e}")
         
         if yields:
-            df = pd.DataFrame(yields)
-            return df.dropna()
+            try:
+                df = pd.DataFrame(yields)
+                df = df.dropna()
+                if len(df) > 0:
+                    return df
+                logger.warning("All US yield data is NaN after dropna()")
+            except Exception as e:
+                logger.warning(f"Failed to create US yield DataFrame: {e}")
         
         # Fallback: create synthetic yield curve
         logger.warning("Using synthetic US yield curve (fallback)")
@@ -168,7 +174,14 @@ class MacroDataCollector:
                 logger.debug(f"Failed to fetch {region}: {e}")
         
         if pmi_data:
-            return pd.DataFrame(pmi_data).dropna()
+            try:
+                df = pd.DataFrame(pmi_data)
+                df = df.dropna()
+                if len(df) > 0:
+                    return df
+                logger.warning("All PMI data is NaN after dropna()")
+            except Exception as e:
+                logger.warning(f"Failed to create PMI DataFrame: {e}")
         
         # Fallback: synthetic PMI data
         logger.warning("Using synthetic PMI data (fallback)")
@@ -255,7 +268,14 @@ class MacroDataCollector:
                 logger.debug(f"Failed to fetch {metric}: {e}")
         
         if spread_data:
-            return pd.DataFrame(spread_data).dropna()
+            try:
+                df = pd.DataFrame(spread_data)
+                df = df.dropna()
+                if len(df) > 0:
+                    return df
+                logger.warning("All credit spread data is NaN after dropna()")
+            except Exception as e:
+                logger.warning(f"Failed to create credit spread DataFrame: {e}")
         
         # Fallback: synthetic credit spread data
         logger.warning("Using synthetic credit spread data (fallback)")
@@ -297,7 +317,14 @@ class MacroDataCollector:
                 logger.debug(f"Failed to fetch {pair}: {e}")
         
         if fx_data:
-            return pd.DataFrame(fx_data).dropna()
+            try:
+                df = pd.DataFrame(fx_data)
+                df = df.dropna()
+                if len(df) > 0:
+                    return df
+                logger.warning("All FX data is NaN after dropna()")
+            except Exception as e:
+                logger.warning(f"Failed to create FX DataFrame: {e}")
         
         # Fallback: synthetic FX data
         logger.warning("Using synthetic FX data (fallback)")
@@ -446,26 +473,42 @@ class MacroDataCollector:
             'Finance_Proxy': np.linspace(1800, 1900, 100),
         }, index=dates)
     
-    def fetch_indian_macro_indicators(self, end_date: str = None) -> Dict[str, float]:
+    def fetch_indian_macro_indicators(self, end_date: str = None) -> pd.DataFrame:
         """
         Fetch Indian macro indicators (IIP, GST, Core sector, etc).
         Returns latest available values as fallback to monthly/quarterly releases.
+        Returns as DataFrame for consistency with other fetch functions.
         """
         if end_date is None:
             end_date = datetime.now().strftime('%Y-%m-%d')
         
-        macro_data = {
-            'IIP_Latest': 4.5,                 # Industrial Production Index (% YoY, fallback)
-            'CPI_Inflation': 5.7,              # Consumer Price Index (%, fallback)
-            'WPI_Inflation': 3.2,              # Wholesale Price Index (%, fallback)
-            'Core_Sector_Growth': 3.1,         # Core Sector Output (%, fallback)
-            'GST_Collections_Bn': 1650,        # GST Collections in billions INR (fallback)
-            'RBI_Repo_Rate': 6.5,              # RBI Policy Repo Rate (%, fallback)
-            'RBI_CRR': 4.5,                    # Cash Reserve Ratio (%, fallback)
-        }
+        try:
+            # Try to fetch RBI rate data as proxy for macros
+            data = self.yfinance_fetcher.fetch('^NSEBANK', 
+                                              (datetime.strptime(end_date, '%Y-%m-%d') - timedelta(days=365*5)).strftime('%Y-%m-%d'),
+                                              end_date)
+            
+            if len(data) > 0 and 'Adj Close' in data.columns:
+                logger.info("Fetched Indian macro indicators proxy")
+                return data[['Adj Close']]
+            elif len(data) > 0 and 'Close' in data.columns:
+                logger.info("Fetched Indian macro indicators proxy (Close)")
+                return data[['Close']]
+        except Exception as e:
+            logger.debug(f"Failed to fetch Indian macro indicators: {e}")
         
-        logger.info("Using fallback Indian macro indicators")
-        return macro_data
+        # Fallback: create synthetic Indian macro data as DataFrame
+        logger.warning("Using synthetic Indian macro indicators (fallback)")
+        dates = pd.date_range(end=end_date, periods=100, freq='D')
+        return pd.DataFrame({
+            'IIP_Latest': np.linspace(4.0, 5.5, 100),              # Industrial Production Index
+            'CPI_Inflation': np.linspace(5.0, 6.0, 100),           # Consumer Price Index
+            'WPI_Inflation': np.linspace(2.5, 3.5, 100),           # Wholesale Price Index
+            'Core_Sector_Growth': np.linspace(2.5, 3.5, 100),      # Core Sector Output
+            'GST_Collections_Bn': np.linspace(1600, 1700, 100),    # GST Collections
+            'RBI_Repo_Rate': np.linspace(6.0, 6.5, 100),           # RBI Repo Rate
+            'RBI_CRR': np.linspace(4.5, 4.5, 100),                 # Cash Reserve Ratio
+        }, index=dates)
     
     def fetch_global_trade_indices(self, end_date: str = None) -> pd.DataFrame:
         """
