@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 from scipy.optimize import minimize
-from scipy.special import logsumexp
+from scipy.special import logsumexp, softmax
 from typing import Tuple, Dict, List, Optional
 import logging
 
@@ -63,8 +63,8 @@ class RegimeSwitchingVAR:
                     except np.linalg.LinAlgError:
                         regime_probs[:, regime] = -np.inf
             
-            # Normalize
-            regime_probs = stats.softmax(regime_probs, axis=1)
+            # Normalize using softmax
+            regime_probs = softmax(regime_probs, axis=1)
             
             # M-step: update assignments
             new_assignment = np.argmax(regime_probs, axis=1)

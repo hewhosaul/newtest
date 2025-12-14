@@ -299,11 +299,20 @@ class GlobalMacroToEquityBridge:
     def get_macro_regime_signal(self, current_macro: np.ndarray) -> Dict[str, float]:
         """Get current macro regime signal."""
         try:
-            regime_idx = self.regime_detector.predict_regime(current_macro)
+            # Ensure proper shape for regime detection
+            current_macro = np.atleast_1d(current_macro)
+            if current_macro.ndim == 1:
+                current_macro = current_macro.reshape(1, -1)
+            elif current_macro.ndim == 2 and current_macro.shape[0] == 1:
+                pass  # Already proper shape
+            else:
+                current_macro = current_macro.reshape(1, -1)
+            
+            regime_idx = self.regime_detector.predict_regime(current_macro.flatten())
             regime_name = self.regime_detector.get_regime_name(regime_idx)
             
             return {
-                'regime_index': regime_idx,
+                'regime_index': int(regime_idx),
                 'regime_name': regime_name,
                 'growth_signal': 1.0 if regime_idx == 0 else 0.5,
                 'risk_off_signal': 1.0 if regime_idx == 1 else 0.0,

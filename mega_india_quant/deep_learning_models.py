@@ -343,8 +343,19 @@ class HybridDeepLearningEnsemble:
         """Train all models."""
         try:
             if len(returns) > 100:
-                self.lstm.fit(returns, epochs=20)
-                self.transformer.fit(price_data, epochs=15)
+                # Ensure data is properly shaped
+                if isinstance(returns, (list, pd.Series)):
+                    returns = np.array(returns)
+                if isinstance(price_data, (list, pd.Series)):
+                    price_data = np.array(price_data)
+                
+                # Flatten if needed
+                returns = np.atleast_1d(returns).flatten()
+                price_data = np.atleast_1d(price_data).flatten()
+                
+                # Train models with proper data
+                self.lstm.fit(returns.reshape(-1, 1), epochs=20)
+                self.transformer.fit(price_data.reshape(-1, 1), epochs=15)
                 self.garch.fit(returns)
                 logger.info("All deep learning models trained")
         except Exception as e:

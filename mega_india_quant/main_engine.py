@@ -293,8 +293,13 @@ class MegaIndiaQuantSystem:
                 equity_df = self.macro_data_cache['indian_equities']
                 
                 if 'NIFTY50' in equity_df.columns and len(equity_df) > 20:
-                    prices = equity_df['NIFTY50'].values
-                    volumes = equity_df.get('volume', np.ones_like(prices))
+                    prices = np.array(equity_df['NIFTY50'].values, dtype=float)
+                    
+                    # Get volumes if available, otherwise use constant
+                    if 'volume' in equity_df.columns:
+                        volumes = np.array(equity_df['volume'].values, dtype=float)
+                    else:
+                        volumes = np.ones_like(prices) * 1000000
                     
                     # Create OHLCV data structure (use close for simplicity)
                     ohlcv_data = {
@@ -424,20 +429,22 @@ class MegaIndiaQuantSystem:
                 regime=int(regime)
             )
             
-            # Build complete forecast
+            # Build complete forecast (ensure all values are scalars)
             self.latest_forecast = {
-                'timestamp': datetime.now(),
-                'macro_signal': macro_signal,
-                'factor_signal': factor_signal,
-                'technical_signal': technical_signal,
-                'dl_signal': dl_signal,
-                'cv_signal': cv_signal,
-                'intraday_signals': intraday_signals,
-                'microstructure_signal': microstructure_signal,
-                'fused_forecast': fused_forecast,
-                'final_signal': fused_forecast.get('final_signal', 0.5),
-                'regime': regime,
-                'confidence': self._compute_confidence(fused_forecast),
+                'timestamp': str(datetime.now()),
+                'macro_signal': float(macro_signal),
+                'factor_signal': float(factor_signal),
+                'technical_signal': float(technical_signal),
+                'dl_signal': float(dl_signal),
+                'cv_signal': float(cv_signal),
+                'intraday_signals': {k: float(v) if isinstance(v, (int, float)) else v 
+                                    for k, v in intraday_signals.items()},
+                'microstructure_signal': float(microstructure_signal),
+                'fused_forecast': {k: float(v) if isinstance(v, (int, float)) else v 
+                                  for k, v in fused_forecast.items()},
+                'final_signal': float(fused_forecast.get('final_signal', 0.5)),
+                'regime': int(regime) if isinstance(regime, (int, float, np.integer)) else -1,
+                'confidence': float(self._compute_confidence(fused_forecast)),
             }
             
             logger.info(f"Forecast generated. Final signal: {self.latest_forecast['final_signal']:.3f}")
@@ -471,30 +478,31 @@ class MegaIndiaQuantSystem:
         try:
             logger.info("Running backtest...")
             
-            for idx, row in data.iterrows():
+            for position, (idx, row) in enumerate(data.iterrows()):
                 # Generate forecast for this date
                 # Simplified: use returns to generate signals
                 
                 # Simulated signal
                 if 'NIFTY50' in data.columns:
-                    price = row['NIFTY50']
-                    signal = 0.5 + 0.3 * np.sin(idx / 50.0)  # Oscillating signal
+                    price = float(row['NIFTY50'])
+                    # Use position counter instead of timestamp for signal generation
+                    signal = 0.5 + 0.3 * np.sin(position / 50.0)  # Oscillating signal
                     
                     if signal > 0.6:
-                        self.backtester.open_position(idx, 'NIFTY50', 'long', price, signal - 0.5)
+                        self.backtester.open_position(str(idx), 'NIFTY50', 'long', price, signal - 0.5)
                     
                     if signal < 0.4:
                         if 'NIFTY50' in self.backtester.positions:
-                            self.backtester.close_position(idx, 'NIFTY50', price)
+                            self.backtester.close_position(str(idx), 'NIFTY50', price)
                     
                     # Mark to market
                     self.backtester.mark_to_market({'NIFTY50': price})
             
             # Close remaining positions
             if len(data) > 0:
-                final_price = data.iloc[-1]['NIFTY50'] if 'NIFTY50' in data.columns else 17000.0
+                final_price = float(data.iloc[-1]['NIFTY50']) if 'NIFTY50' in data.columns else 17000.0
                 if 'NIFTY50' in self.backtester.positions:
-                    self.backtester.close_position(data.index[-1], 'NIFTY50', final_price)
+                    self.backtester.close_position(str(data.index[-1]), 'NIFTY50', final_price)
             
             # Get results
             results = self.backtester.generate_report()

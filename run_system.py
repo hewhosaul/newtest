@@ -10,6 +10,7 @@ import logging
 from datetime import datetime, timedelta
 import pandas as pd
 import numpy as np
+import os
 
 from mega_india_quant.main_engine import MegaIndiaQuantSystem
 
@@ -30,6 +31,9 @@ def main():
                        help='Output file for results')
     
     args = parser.parse_args()
+    
+    # Create results directory if it doesn't exist
+    os.makedirs(os.path.dirname(args.output) or '.', exist_ok=True)
     
     logger.info("=" * 80)
     logger.info("MEGA INDIA QUANT SYSTEM - INSTITUTIONAL TRADING ENGINE")
