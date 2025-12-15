@@ -1,0 +1,252 @@
+# Mega India Quant System Configuration
+
+# System settings
+system:
+  mode: backtest  # backtest or live
+  timezone: IST
+  data_frequency: daily  # daily or intraday
+
+# Data collection
+data:
+  sources:
+    - yfinance
+    - trading_economics
+    - nse_india
+    - rbi
+  fallback_enabled: true
+  cache_enabled: true
+  cache_dir: ./data/cache
+  history_days: 1825  # 5 years
+
+# Macro models
+macro_models:
+  favar:
+    n_factors: 3
+    lag_order: 4
+    enabled: true
+  
+  dfm:
+    n_factors: 2
+    max_lag: 3
+    enabled: true
+  
+  midas:
+    high_freq_lags: 22
+    low_freq_lags: 3
+    enabled: true
+  
+  hmm_regime:
+    n_regimes: 4
+    n_iter: 1000
+    enabled: true
+  
+  yield_curve:
+    enabled: true
+    tenors: [1Y, 2Y, 5Y, 10Y, 30Y]
+
+# Factor models
+factor_models:
+  carhart_4factor:
+    enabled: true
+    lookback_momentum: 252
+  
+  fama_french_5factor:
+    enabled: true
+  
+  betting_against_beta:
+    enabled: true
+  
+  momentum:
+    lookback_period: 252
+    enabled: true
+  
+  value:
+    enabled: true
+  
+  quality:
+    enabled: true
+
+# Deep learning
+deep_learning:
+  lstm_volatility:
+    lookback_window: 60
+    forecast_horizon: 5
+    epochs: 50
+    enabled: true
+  
+  transformer:
+    d_model: 64
+    num_heads: 4
+    seq_length: 60
+    epochs: 30
+    enabled: true
+  
+  cnn_microstructure:
+    kernel_size: 3
+    num_filters: 32
+    enabled: true
+  
+  garch:
+    alpha: 0.1
+    beta: 0.85
+    enabled: true
+
+# Computer vision
+computer_vision:
+  candlestick_generator:
+    width: 64
+    height: 64
+    enabled: true
+  
+  orderflow_heatmap:
+    grid_size: 32
+    enabled: true
+  
+  chart_patterns:
+    enabled: true
+    patterns: [head_shoulders, double_top, triangle]
+  
+  regime_analyzer:
+    feature_dim: 32
+    enabled: true
+
+# Intraday models
+intraday:
+  microprice_forecaster:
+    lookback_period: 100
+    enabled: true
+  
+  order_flow_imbalance:
+    decay_factor: 0.95
+    enabled: true
+  
+  hawkes_process:
+    lambda_0: 0.1
+    alpha: 0.05
+    beta: 0.95
+    enabled: true
+  
+  queue_reaction:
+    queue_elasticity: 0.1
+    enabled: true
+  
+  almgren_chriss:
+    time_horizon: 1.0
+    enabled: true
+  
+  realized_volatility_nowcast:
+    enabled: true
+
+# Advanced models
+advanced:
+  regime_switching_var:
+    n_regimes: 2
+    lag_order: 1
+    enabled: true
+  
+  particle_filter:
+    n_particles: 1000
+    enabled: true
+  
+  ensemble_kalman_filter:
+    n_ensemble: 100
+    process_noise: 0.01
+    obs_noise: 0.1
+    enabled: true
+  
+  bayesian_hierarchical:
+    n_groups: 5
+    enabled: true
+  
+  gaussian_copula:
+    enabled: true
+  
+  change_point_detection:
+    penalty: bic
+    min_segment_length: 10
+    enabled: true
+  
+  granger_causality:
+    max_lag: 5
+    significance_level: 0.05
+    enabled: true
+
+# Fusion
+fusion:
+  attention_fusion:
+    n_views: 6
+    hidden_dim: 32
+    n_heads: 4
+    enabled: true
+  
+  early_fusion:
+    enabled: true
+  
+  late_fusion:
+    enabled: true
+  
+  hybrid_fusion:
+    initial_early_weight: 0.5
+    initial_late_weight: 0.5
+    enabled: true
+  
+  modality_alignment:
+    embedding_dim: 64
+    enabled: true
+
+# Self-learning
+self_learning:
+  enabled: true
+  mutation_rate: 0.3
+  population_size: 20
+  model_types:
+    - macro
+    - factor
+    - technical
+    - ml
+    - dl
+    - cv
+    - microstructure
+    - advanced
+  reward_components:
+    sharpe: 0.35
+    win_rate: 0.25
+    stability: 0.20
+    drawdown: 0.15
+    speed: 0.05
+
+# Backtesting
+backtester:
+  initial_capital: 1000000
+  commission: 0.001  # 10 bps
+  slippage: 0.0005   # 5 bps
+  max_position_pct: 0.02
+  max_drawdown: 0.15
+  stop_loss_pct: 0.02
+  position_sizing: kelly  # kelly or volatility_adjusted
+  
+  walk_forward:
+    enabled: true
+    train_period: 252
+    test_period: 63
+
+# Output
+output:
+  results_dir: ./results
+  logs_dir: ./logs
+  save_trades: true
+  save_equity_curve: true
+  save_plots: true
+  format: json
+
+# Logging
+logging:
+  level: INFO
+  file: ./logs/mega_india_quant.log
+  console: true
+
+# Performance
+performance:
+  num_threads: 4
+  cache_size_mb: 512
+  gpu_enabled: false
